@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Java Application Deployment Script for EC2 with RDS
+# Java Application Deployment Script for EC2 with RDS - FIXED VERSION
 echo "========================================="
-echo "Setting up Java Application on EC2"
+echo "Setting up Java Application on EC2 (Fixed)"
 echo "========================================="
 
 # Update system
@@ -11,7 +11,7 @@ sudo apt update -y
 
 # Install required packages
 echo "Installing required packages..."
-sudo apt install -y wget curl unzip mysql-client maven git
+sudo apt install -y wget curl unzip mysql-client maven git openjdk-17-jdk
 
 # Create application directory
 APP_DIR="/opt/java-todo-app"
@@ -19,16 +19,15 @@ echo "Creating application directory: $APP_DIR"
 sudo mkdir -p $APP_DIR
 sudo chown -R $USER:$USER $APP_DIR
 
-# Download and install OpenJDK (alternative to Oracle JDK)
-echo "Installing OpenJDK 17..."
-sudo apt install -y openjdk-17-jdk
+# Set JAVA_HOME for current session and permanently
+JAVA_HOME_PATH=$(dirname $(dirname $(readlink -f $(which java))))
+echo "Setting up JAVA_HOME: $JAVA_HOME_PATH"
+export JAVA_HOME=$JAVA_HOME_PATH
+export PATH=$PATH:$JAVA_HOME/bin
 
-# Set JAVA_HOME
-echo "Setting up JAVA_HOME..."
-JAVA_HOME_PATH=$(sudo update-alternatives --query java | grep 'Value:' | cut -d' ' -f2 | sed 's|/bin/java||')
-echo "export JAVA_HOME=$JAVA_HOME_PATH" | sudo tee -a /etc/environment
-echo "export PATH=\$PATH:\$JAVA_HOME/bin" | sudo tee -a /etc/environment
-source /etc/environment
+# Add to /etc/environment
+echo "JAVA_HOME=$JAVA_HOME_PATH" | sudo tee -a /etc/environment
+echo "PATH=\"$PATH\"" | sudo tee -a /etc/environment
 
 # Verify Java installation
 echo "Java version:"
@@ -55,7 +54,7 @@ mkdir -p src/main/java/com/todoapp/{model,dao,service,servlet,util}
 mkdir -p src/main/resources
 mkdir -p src/main/webapp/{WEB-INF,css,js}
 
-# Create pom.xml
+# Create pom.xml with corrected Java version
 echo "Creating Maven pom.xml..."
 cat > pom.xml << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -79,25 +78,31 @@ cat > pom.xml << 'EOF'
     <dependencies>
         <!-- Servlet API -->
         <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-            <version>4.0.1</version>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>6.0.0</version>
             <scope>provided</scope>
         </dependency>
         
         <!-- JSP API -->
         <dependency>
-            <groupId>javax.servlet.jsp</groupId>
-            <artifactId>javax.servlet.jsp-api</artifactId>
-            <version>2.3.3</version>
+            <groupId>jakarta.servlet.jsp</groupId>
+            <artifactId>jakarta.servlet.jsp-api</artifactId>
+            <version>3.1.1</version>
             <scope>provided</scope>
         </dependency>
         
         <!-- JSTL -->
         <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>jstl</artifactId>
-            <version>1.2</version>
+            <groupId>jakarta.servlet.jsp.jstl</groupId>
+            <artifactId>jakarta.servlet.jsp.jstl-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.glassfish.web</groupId>
+            <artifactId>jakarta.servlet.jsp.jstl</artifactId>
+            <version>3.0.1</version>
         </dependency>
         
         <!-- MySQL Connector -->
@@ -138,7 +143,7 @@ cat > pom.xml << 'EOF'
 </project>
 EOF
 
-# Create database utility class
+# Create all Java source files (same as before but with Jakarta imports)
 echo "Creating database utility class..."
 cat > src/main/java/com/todoapp/util/DatabaseUtil.java << 'EOF'
 package com.todoapp.util;
@@ -256,7 +261,7 @@ public class Task {
 }
 EOF
 
-# Create Task DAO
+# Create Task DAO (same as before)
 echo "Creating Task DAO..."
 cat > src/main/java/com/todoapp/dao/TaskDAO.java << 'EOF'
 package com.todoapp.dao;
@@ -372,7 +377,7 @@ public class TaskDAO {
 }
 EOF
 
-# Create Task Service
+# Create Task Service (same as before)
 echo "Creating Task Service..."
 cat > src/main/java/com/todoapp/service/TaskService.java << 'EOF'
 package com.todoapp.service;
@@ -441,18 +446,18 @@ public class TaskService {
 }
 EOF
 
-# Create Task Servlet
+# Create Task Servlet with Jakarta imports
 echo "Creating Task Servlet..."
 cat > src/main/java/com/todoapp/servlet/TaskServlet.java << 'EOF'
 package com.todoapp.servlet;
 
 import com.todoapp.model.Task;
 import com.todoapp.service.TaskService;
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
@@ -542,15 +547,15 @@ public class TaskServlet extends HttpServlet {
 }
 EOF
 
-# Create web.xml
+# Create web.xml for Jakarta
 echo "Creating web.xml..."
 cat > src/main/webapp/WEB-INF/web.xml << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
-<web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee 
-         http://xmlns.jcp.org/xml/ns/javaee/web-app_4_0.xsd"
-         version="4.0">
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee 
+         https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         version="6.0">
          
     <display-name>Java Todo Application</display-name>
     
@@ -561,18 +566,37 @@ cat > src/main/webapp/WEB-INF/web.xml << 'EOF'
 </web-app>
 EOF
 
-# Install Tomcat
-echo "Installing Apache Tomcat..."
-TOMCAT_VERSION="10.1.13"
+# Download and install Tomcat 10 (latest version)
+echo "Installing Apache Tomcat 10..."
 cd /opt
-sudo wget https://downloads.apache.org/tomcat/tomcat-10/v${TOMCAT_VERSION}/bin/apache-tomcat-${TOMCAT_VERSION}.tar.gz
-sudo tar -xzf apache-tomcat-${TOMCAT_VERSION}.tar.gz
-sudo mv apache-tomcat-${TOMCAT_VERSION} tomcat
-sudo chown -R $USER:$USER /opt/tomcat
+sudo wget -q --show-progress https://archive.apache.org/dist/tomcat/tomcat-10/v10.1.30/bin/apache-tomcat-10.1.30.tar.gz
 
-# Create Tomcat service
-echo "Creating Tomcat service..."
-sudo tee /etc/systemd/system/tomcat.service > /dev/null << EOF
+if [ ! -f "apache-tomcat-10.1.30.tar.gz" ]; then
+    echo "❌ Failed to download Tomcat. Trying alternative URL..."
+    sudo wget -q --show-progress https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.30/bin/apache-tomcat-10.1.30.tar.gz
+fi
+
+if [ -f "apache-tomcat-10.1.30.tar.gz" ]; then
+    sudo tar -xzf apache-tomcat-10.1.30.tar.gz
+    sudo mv apache-tomcat-10.1.30 tomcat
+    sudo rm apache-tomcat-10.1.30.tar.gz
+    sudo chown -R $USER:$USER /opt/tomcat
+    echo "✅ Tomcat installed successfully"
+else
+    echo "❌ Failed to download Tomcat. Installing from package manager..."
+    sudo apt install -y tomcat10 tomcat10-admin
+    sudo systemctl enable tomcat10
+    TOMCAT_HOME="/usr/share/tomcat10"
+fi
+
+# Set executable permissions for Tomcat scripts
+if [ -d "/opt/tomcat" ]; then
+    sudo chmod +x /opt/tomcat/bin/*.sh
+    TOMCAT_HOME="/opt/tomcat"
+    
+    # Create Tomcat service
+    echo "Creating Tomcat service..."
+    sudo tee /etc/systemd/system/tomcat.service > /dev/null << EOF
 [Unit]
 Description=Apache Tomcat Web Application Container
 After=network.target
@@ -596,10 +620,32 @@ Restart=always
 [Install]
 WantedBy=multi-user.target
 EOF
+    
+    # Enable and start Tomcat
+    sudo systemctl daemon-reload
+    sudo systemctl enable tomcat
+    sudo systemctl start tomcat
+    
+    # Wait for Tomcat to start
+    sleep 5
+    
+    if sudo systemctl is-active --quiet tomcat; then
+        echo "✅ Tomcat service started successfully"
+    else
+        echo "⚠️  Tomcat service failed to start, checking logs..."
+        sudo systemctl status tomcat --no-pager
+    fi
+    
+    WEBAPPS_DIR="/opt/tomcat/webapps"
+else
+    TOMCAT_HOME="/usr/share/tomcat10"
+    WEBAPPS_DIR="/var/lib/tomcat10/webapps"
+    sudo systemctl start tomcat10
+fi
 
-# Create database setup script
+# Create database setup script in the current directory
 echo "Creating database setup script..."
-cat > setup_database_java.sh << 'EOF'
+cat > $HOME/setup_database_java.sh << 'EOF'
 #!/bin/bash
 
 echo "========================================="
@@ -607,13 +653,6 @@ echo "Java App Database Setup Script"
 echo "========================================="
 
 DB_CONFIG="/opt/java-todo-app/db.properties"
-
-# Load current configuration
-if [ ! -f "$DB_CONFIG" ]; then
-    echo "❌ Database configuration file not found!"
-    echo "Please run the main setup_java.sh script first."
-    exit 1
-fi
 
 # Check if configuration needs updating
 if grep -q "your-rds-endpoint" "$DB_CONFIG"; then
@@ -644,7 +683,7 @@ EOL
     echo "✅ Database credentials updated!"
 else
     # Load existing configuration
-    source <(grep -v '^#' "$DB_CONFIG" | sed 's/^/export /')
+    eval $(grep -v '^#' "$DB_CONFIG" | sed 's/^/export /')
 fi
 
 echo ""
@@ -677,17 +716,38 @@ if mysql -h"$db_host" -P"$db_port" -u"$db_user" -p"$db_pass" -e "SELECT 1;" > /d
     
     # Build the application
     cd /opt/java-todo-app
-    mvn clean package
+    export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+    mvn clean package -q
     
     if [ $? -eq 0 ]; then
+        echo "✅ Application built successfully!"
+        
+        # Find the correct webapps directory
+        if [ -d "/opt/tomcat/webapps" ]; then
+            WEBAPPS_DIR="/opt/tomcat/webapps"
+            SERVICE_NAME="tomcat"
+        else
+            WEBAPPS_DIR="/var/lib/tomcat10/webapps"
+            SERVICE_NAME="tomcat10"
+        fi
+        
         # Deploy to Tomcat
-        sudo cp target/todo-app.war /opt/tomcat/webapps/
+        sudo cp target/todo-app.war $WEBAPPS_DIR/
+        echo "✅ Application deployed to $WEBAPPS_DIR"
         
         # Restart Tomcat
-        sudo systemctl restart tomcat
+        sudo systemctl restart $SERVICE_NAME
+        sleep 5
         
-        echo "🎉 Application deployed successfully!"
-        echo "Access your app at: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo 'your-ec2-ip'):8080/todo-app/tasks"
+        if sudo systemctl is-active --quiet $SERVICE_NAME; then
+            echo "✅ Tomcat restarted successfully!"
+            echo ""
+            echo "🎉 Application deployed successfully!"
+            echo "Access your app at: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo 'your-ec2-ip'):8080/todo-app/tasks"
+        else
+            echo "⚠️  Tomcat failed to restart. Check logs:"
+            echo "sudo systemctl status $SERVICE_NAME"
+        fi
     else
         echo "❌ Failed to build application"
         exit 1
@@ -700,18 +760,15 @@ else
 fi
 EOF
 
-chmod +x setup_database_java.sh
-
-# Enable and start Tomcat
-echo "Starting Tomcat service..."
-sudo systemctl daemon-reload
-sudo systemctl enable tomcat
-sudo systemctl start tomcat
+chmod +x $HOME/setup_database_java.sh
 
 # Set proper permissions
 echo "Setting file permissions..."
 sudo chown -R $USER:$USER $APP_DIR
 chmod -R 755 $APP_DIR
+
+# Get public IP more reliably
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "your-ec2-ip")
 
 echo ""
 echo "========================================="
@@ -720,10 +777,10 @@ echo "========================================="
 echo ""
 echo "📝 Next Steps:"
 echo "1. Configure your RDS database:"
-echo "   ./setup_database_java.sh"
+echo "   $HOME/setup_database_java.sh"
 echo ""
 echo "🌐 Application will be accessible at:"
-echo "   http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo 'your-ec2-ip'):8080/todo-app/tasks"
+echo "   http://$PUBLIC_IP:8080/todo-app/tasks"
 echo ""
 echo "🔒 Security Group Requirements:"
 echo "   - EC2: Allow HTTP (port 8080) inbound from 0.0.0.0/0"
@@ -731,11 +788,12 @@ echo "   - RDS: Allow MySQL (port 3306) from EC2 security group"
 echo ""
 echo "📁 Application files: $APP_DIR"
 echo "🔧 Database config: $APP_DIR/db.properties"
+echo "🔧 Database setup script: $HOME/setup_database_java.sh"
 echo ""
 echo "🛠️  Useful commands:"
-echo "   - Setup database: ./setup_database_java.sh"
-echo "   - Restart Tomcat: sudo systemctl restart tomcat"
+echo "   - Setup database: $HOME/setup_database_java.sh"
+echo "   - Restart Tomcat: sudo systemctl restart tomcat (or tomcat10)"
 echo "   - View Tomcat logs: sudo tail -f /opt/tomcat/logs/catalina.out"
 echo "   - Rebuild app: cd $APP_DIR && mvn clean package"
 echo ""
-echo "========================================="    
+echo "========================================="
