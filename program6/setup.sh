@@ -33,10 +33,165 @@ cat > /var/www/html/todo-app/config/.env << 'EOF'
 # Database Configuration - UPDATE THESE VALUES
 DB_HOST=your-rds-endpoint.region.rds.amazonaws.com
 DB_NAME=todo_app
-DB_USER=admin
-DB_PASS=adminadmin
+DB_USER=your_username
+DB_PASS=your_password
 DB_PORT=3306
 EOF
+
+# Function to create database
+create_database() {
+    echo ""
+    echo "========================================="
+    echo "Database Setup"
+    echo "========================================="
+    
+    # Load environment variables
+    source /var/www/html/todo-app/config/.env
+    
+    # Check if database credentials are configured
+    if [[ "$DB_HOST" == "your-rds-endpoint.region.rds.amazonaws.com" ]]; then
+        echo "⚠️  Database credentials not configured yet."
+        echo "Please update /var/www/html/todo-app/config/.env with your RDS details first."
+        echo ""
+        echo "After updating credentials, run:"
+        echo "bash setup_database.sh"
+        return 1
+    fi
+    
+    echo "Testing database connection..."
+    
+    # Test connection without database name first
+    if mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" -e "SELECT 1;" > /dev/null 2>&1; then
+        echo "✅ Database connection successful!"
+        
+        # Check if database exists
+        DB_EXISTS=$(mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" -e "SHOW DATABASES LIKE '$DB_NAME';" | grep -o "$DB_NAME")
+        
+        if [[ "$DB_EXISTS" == "$DB_NAME" ]]; then
+            echo "✅ Database '$DB_NAME' already exists."
+        else
+            echo "Creating database '$DB_NAME'..."
+            mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" -e "CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+            
+            if [ $? -eq 0 ]; then
+                echo "✅ Database '$DB_NAME' created successfully!"
+            else
+                echo "❌ Failed to create database '$DB_NAME'"
+                return 1
+            fi
+        fi
+        
+        # Test connection to the specific database
+        if mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT 1;" > /dev/null 2>&1; then
+            echo "✅ Connection to database '$DB_NAME' successful!"
+            echo "🎉 Database setup complete!"
+            return 0
+        else
+            echo "❌ Failed to connect to database '$DB_NAME'"
+            return 1
+        fi
+    else
+        echo "❌ Failed to connect to database server."
+        echo "Please check your RDS credentials in /var/www/html/todo-app/config/.env"
+        return 1
+    fi
+}
+
+# Create separate database setup script
+echo "Creating database setup script..."
+cat > setup_database.sh << 'EOF'
+#!/bin/bash
+
+echo "========================================="
+echo "Database Setup Script"
+echo "========================================="
+
+# Load environment variables
+if [ ! -f "/var/www/html/todo-app/config/.env" ]; then
+    echo "❌ Environment file not found!"
+    echo "Please run the main setup.sh script first."
+    exit 1
+fi
+
+source /var/www/html/todo-app/config/.env
+
+# Prompt for database credentials if not set
+if [[ "$DB_HOST" == "your-rds-endpoint.region.rds.amazonaws.com" ]]; then
+    echo "Please enter your RDS database credentials:"
+    echo ""
+    read -p "RDS Endpoint (e.g., mydb.abc123.us-east-1.rds.amazonaws.com): " db_host
+    read -p "Database Name [todo_app]: " db_name
+    read -p "Username: " db_user
+    read -s -p "Password: " db_pass
+    echo ""
+    read -p "Port [3306]: " db_port
+    
+    # Set defaults
+    db_name=${db_name:-todo_app}
+    db_port=${db_port:-3306}
+    
+    # Update .env file
+    cat > /var/www/html/todo-app/config/.env << EOL
+# Database Configuration
+DB_HOST=$db_host
+DB_NAME=$db_name
+DB_USER=$db_user
+DB_PASS=$db_pass
+DB_PORT=$db_port
+EOL
+    
+    echo "✅ Database credentials updated!"
+    
+    # Reload variables
+    source /var/www/html/todo-app/config/.env
+fi
+
+echo ""
+echo "Testing database connection..."
+
+# Test connection without database name first
+if mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" -e "SELECT 1;" > /dev/null 2>&1; then
+    echo "✅ Database server connection successful!"
+    
+    # Check if database exists
+    DB_EXISTS=$(mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" -e "SHOW DATABASES LIKE '$DB_NAME';" 2>/dev/null | grep -o "$DB_NAME")
+    
+    if [[ "$DB_EXISTS" == "$DB_NAME" ]]; then
+        echo "✅ Database '$DB_NAME' already exists."
+    else
+        echo "Creating database '$DB_NAME'..."
+        mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" -e "CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null
+        
+        if [ $? -eq 0 ]; then
+            echo "✅ Database '$DB_NAME' created successfully!"
+        else
+            echo "❌ Failed to create database '$DB_NAME'"
+            echo "Please check if your user has CREATE privileges."
+            exit 1
+        fi
+    fi
+    
+    # Test connection to the specific database
+    if mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT 1;" > /dev/null 2>&1; then
+        echo "✅ Connection to database '$DB_NAME' successful!"
+        echo ""
+        echo "🎉 Database setup complete!"
+        echo "You can now access your todo application at: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo 'your-ec2-ip')"
+        echo ""
+    else
+        echo "❌ Failed to connect to database '$DB_NAME'"
+        echo "Please check your credentials and database permissions."
+        exit 1
+    fi
+else
+    echo "❌ Failed to connect to database server."
+    echo "Please verify your RDS endpoint, username, and password."
+    echo "Also ensure your EC2 security group can connect to RDS on port $DB_PORT"
+    exit 1
+fi
+EOF
+
+chmod +x setup_database.sh
 
 # Create database configuration
 echo "Creating database configuration file..."
@@ -527,6 +682,9 @@ sudo a2enmod rewrite
 echo "Restarting Apache..."
 sudo systemctl restart apache2
 
+# Attempt database setup
+create_database
+
 # Display completion message
 echo ""
 echo "========================================="
@@ -535,23 +693,20 @@ echo "========================================="
 echo ""
 echo "Your Todo application is now ready!"
 echo ""
-echo "📝 Next Steps:"
-echo "1. Edit database credentials in: /var/www/html/todo-app/config/.env"
-echo "2. Update these values with your RDS information:"
-echo "   - DB_HOST=your-rds-endpoint.region.rds.amazonaws.com"
-echo "   - DB_NAME=todo_app"
-echo "   - DB_USER=your_username"
-echo "   - DB_PASS=your_password"
+echo "📝 Database Setup:"
+echo "If database creation failed or you need to configure it later:"
+echo "   ./setup_database.sh"
 echo ""
-echo "🌐 Access your application at: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
+echo "🌐 Access your application at: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo 'your-ec2-ip')"
 echo ""
 echo "🔒 Security Group Requirements:"
-echo "   - EC2: Allow HTTP (port 80) inbound"
-echo "   - RDS: Allow MySQL (port 3306) from EC2"
+echo "   - EC2: Allow HTTP (port 80) inbound from 0.0.0.0/0"
+echo "   - RDS: Allow MySQL (port 3306) from EC2 security group"
 echo ""
 echo "📁 Application files located at: /var/www/html/todo-app/"
 echo ""
 echo "🔧 Useful commands:"
+echo "   - Setup database: ./setup_database.sh"
 echo "   - Restart Apache: sudo systemctl restart apache2"
 echo "   - View Apache logs: sudo tail -f /var/log/apache2/todo-app_error.log"
 echo "   - Edit config: nano /var/www/html/todo-app/config/.env"
