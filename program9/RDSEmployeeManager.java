@@ -2,10 +2,11 @@ import java.sql.*;
 import java.util.Scanner;
 
 public class RDSEmployeeManager {
-    // Database connection parameters - UPDATE THESE WITH YOUR RDS DETAILS
-    static final String JDBC_URL = "jdbc:mysql://your-rds-endpoint.region.rds.amazonaws.com:3306/your_database_name";
-    static final String JDBC_USER = "your_master_username";
-    static final String JDBC_PASS = "your_master_password";
+    // Database connection parameters - UPDATED WITH YOUR RDS DETAILS
+    // in the end of 3306/ add employeedb, example : "3306/employeedb"
+    static final String JDBC_URL = "jdbc:mysql://labdb5.chqy6iocw0k8.ap-south-1.rds.amazonaws.com:3306/employeedb";
+    static final String JDBC_USER = "admin";
+    static final String JDBC_PASS = "adminadmin";
     
     public static void main(String[] args) {
         Connection conn = null;
